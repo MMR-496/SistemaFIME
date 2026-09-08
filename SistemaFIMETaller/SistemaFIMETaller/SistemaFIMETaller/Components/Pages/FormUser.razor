@@ -1,0 +1,101 @@
+﻿@page "/users/nuevo"
+@page "/users/editar/{Id:int}"
+@using SistemaFIMETaller.Models
+@using SistemaFIMETaller.Services.CookieAccessToken
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@inject UserClientService UserClientService
+@inject NavigationManager nav
+
+<PageTitle>Usuarios</PageTitle>
+<h3>@titulo Usuario</h3>
+
+<EditForm Model="usuario" FormName="frmUsuarios" OnValidSubmit="Guardar">
+    <DataAnnotationsValidator />
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Nombre</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="usuario.NombreUsuario" />
+            <ValidationMessage For="@(() => usuario.NombreUsuario)" />
+        </div>
+    </div>
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Número de Cuenta</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="usuario.NumeroCuenta" />
+            <ValidationMessage For="@(() => usuario.NumeroCuenta)" />
+        </div>
+    </div>
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Correo</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="usuario.CorreoInsti" />
+            <ValidationMessage For="@(() => usuario.CorreoInsti)" />
+        </div>
+    </div>
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Rol</label>
+        <div class="col-sm-10">
+            <select @bind="usuario.Rol" class="form-control">
+                <option value="">Selecciona un rol</option>
+                <option value="Admin">Administrador</option>
+                <option value="Avanzado">Avanzado</option>
+                <option value="Basico">Básico</option>
+            </select>
+            <ValidationMessage For="@(() => usuario.Rol)" />
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-10 offset-sm-2">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <button type="button" class="btn btn-danger" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Usuario usuario = new();
+    private string titulo = "Nuevo";
+    private bool cargado = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (Id > 0)
+            {
+                var usuarioExistente = await UserClientService.ObtenerPorId(Id);
+                if (usuarioExistente != null)
+                {
+                    usuario = usuarioExistente;
+                    titulo = "Editar";
+                }
+            }
+            cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (Id > 0)
+        {
+            var result = await UserClientService.Actualizar(usuario);
+            if (!result)
+            {
+                // temporal para debug
+                Console.WriteLine("Error al actualizar");
+                return;
+            }
+        }
+        else
+            await UserClientService.Registrar(usuario);
+        Cancelar();
+    }
+
+    private void Cancelar()
+    {
+        nav.NavigateTo("/users");
+    }
+}

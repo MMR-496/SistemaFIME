@@ -1,0 +1,119 @@
+﻿@page "/register"
+@attribute [Authorize(Roles = "Admin")]
+@layout EmptyLayout
+@using SistemaFIMETaller.Services.CookieAccessToken
+@inject AuthService AuthService
+@inject NavigationManager nav
+
+
+<style>
+    body {
+        background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .login-container {
+        width: 500px;
+        margin: auto;
+        padding: 30px;
+        border-radius: 5px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    .account-wall {
+        margin-top: 20px;
+        padding: 40px 20px 20px 20px;
+        background-color: #f7f7f7;
+        box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .login-title {
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        display: block;
+    }
+
+    .form-signin {
+        max-width: 330px;
+        padding: 15px;
+        margin: 0 auto;
+    }
+
+        .form-signin .form-control {
+            margin-bottom: 10px;
+            font-size: 16px;
+            height: auto;
+            padding: 10px;
+        }
+</style>
+
+<div class="container">
+    <div class="login-container">
+        <h1 class="text-center login-title">Crear cuenta</h1>
+        <div class="account-wall">
+            <div class="form-signin">
+                <input type="text" @bind-value="NombreUsuario" class="form-control" placeholder="Nombre de usuario" required>
+                <input type="text" @bind-value="NumeroCuenta" class="form-control" placeholder="Número de cuenta" required>
+                <input type="password" @bind-value="Contrasena" class="form-control" placeholder="Contraseña" required>
+                <input type="email" @bind-value="CorreoInsti" class="form-control" placeholder="Correo institucional" required>
+                
+                
+                <div class="d-flex align-items-center gap-2">
+                    <select @bind="Rol" class="form-control">
+                        <option value="">Selecciona un rol</option>
+                        <option value="Admin">Administrador</option>
+                        <option value="Avanzado">Avanzado</option>
+                        <option value="Basico">Básico</option>
+                    </select>
+                    <span data-bs-toggle="tooltip"
+                          title="Administrador: acceso total al sistema. Avanzado: puede gestionar objetos (materiales, reservas, préstamos y personas). Básico: solo puede registrar objetos, sin modificar ni eliminar"
+                          style="cursor:pointer; color:#0d6efd">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle-fill" viewBox="0 0 16 16">
+                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2" />
+                        </svg>
+                    </span>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Mensaje))
+                {
+                    <p class="text-danger mt-2">@Mensaje</p>
+                }
+                <button class="btn btn-lg btn-primary btn-block w-100 mt-3" @onclick="OnRegister">
+                    Registrarse
+                </button>
+                <a href="/login" class="d-block text-center mt-2">Ir a iniciar sesión</a>
+
+                <a href="/administrador" class="d-block text-center mt-2">Regresar</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    public string NombreUsuario { get; set; }
+    public string NumeroCuenta { get; set; }
+    public string Contrasena { get; set; }
+    public string CorreoInsti { get; set; }
+    public string Rol { get; set; }
+    public string Mensaje { get; set; }
+
+    private async Task OnRegister()
+    {
+        var status = await AuthService.Register(NombreUsuario, NumeroCuenta, Contrasena, CorreoInsti, Rol);
+        if (status)
+        {
+            nav.NavigateTo("/users", forceLoad: true);
+        }
+        else
+        {
+            Mensaje = "Error al registrar.";
+        }
+    }
+}

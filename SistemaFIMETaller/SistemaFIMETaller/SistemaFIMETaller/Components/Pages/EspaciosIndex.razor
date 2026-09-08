@@ -1,0 +1,141 @@
+﻿@page "/espacios"
+@attribute [Authorize]
+@using SistemaFIMETaller.Services.EspaciosServices
+@rendermode InteractiveServer
+@inject NavigationManager _navigator
+@inject IEspacioService _espacioService
+@inject ExcelService ExcelService
+@inject IJSRuntime JS
+
+<h3>Espacios</h3>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Buscar por número, nombre, marca o ubicación"
+                   @bind="_filtroBusqueda" @bind:event="oninput" />
+            <button class="btn btn-outline-secondary" type="button" @onclick="AplicarFiltro">
+                <i class="bi bi-search"></i> Buscar
+            </button>
+            
+            <AuthorizeView Roles="Admin">
+            <button class="btn btn-success ms-2" @onclick="ExportarExcel">
+                Exportar Excel
+            </button>
+            </AuthorizeView>
+        </div>
+    </div>
+    <AuthorizeView Roles="Admin">
+    <div class="col-md-6 text-end">
+        <a class="btn btn-success" href="espacios/nuevo">Agregar nuevo espacio</a>
+    </div>
+    </AuthorizeView>
+</div>
+
+@if (_espacios == null)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Cargando...</span>
+    </div>
+}
+else if (_espaciosFiltrados.Count == 0)
+{
+    <div class="alert alert-warning">
+        @if (string.IsNullOrEmpty(_filtroBusqueda))
+        {
+            <span>No hay espacios registrados</span>
+        }
+        else
+        {
+            <span>No se encontraron espacios con el criterio de búsqueda</span>
+        }
+    </div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Ubicación</th>
+                <th>Responsable</th>
+                <th>Observaciones</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in _espaciosFiltrados)
+            {
+                <tr>
+                    <td>@e.NombreEspacio</td>
+                    <td>@e.Ubicacion</td>
+                    <td>@e.Responsable</td>
+                    <td>@e.Observaciones</td>
+                    <AuthorizeView Roles="Admin">
+                    <td>
+                        <button class="btn btn-outline-secondary me-1" @onclick="@(() => Modificar(e.EspacioId))">Editar</button>
+                        <button class="btn btn-outline-danger" @onclick="@(() => EliminarAsync(e))">Eliminar</button>
+                    </td>
+                    </AuthorizeView>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Espacio>? _espacios;
+    private List<Espacio> _espaciosFiltrados = new();
+    private string _filtroBusqueda = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _espacios = await _espacioService.ObtenerTodos();
+        _espaciosFiltrados = _espacios.ToList();
+    }
+
+    private void AplicarFiltro()
+    {
+        if (string.IsNullOrWhiteSpace(_filtroBusqueda))
+        {
+            _espaciosFiltrados = _espacios!.ToList();
+            return;
+        }
+
+        var termino = _filtroBusqueda.ToLower().Trim();
+        _espaciosFiltrados = _espacios!
+            .Where(e =>
+                (!string.IsNullOrEmpty(e.NombreEspacio) && e.NombreEspacio.ToLower().Contains(termino)) ||
+                (!string.IsNullOrEmpty(e.Responsable) && e.Responsable.ToLower().Contains(termino)) ||
+                (!string.IsNullOrEmpty(e.Ubicacion) && e.Ubicacion.ToLower().Contains(termino))
+            )
+            .ToList();
+    }
+
+    private async Task EliminarAsync(Espacio espacio)
+    {
+        await _espacioService.Eliminar(espacio.EspacioId);
+        _espacios!.Remove(espacio);
+        AplicarFiltro();
+        StateHasChanged();
+    }
+
+    private void Modificar(int id)
+    {
+        _navigator.NavigateTo($"/espacios/editar/{id}");
+    }
+    private async Task ExportarExcel()
+    {
+        var bytes = ExcelService.GenerarExcelEspacios(_espaciosFiltrados);
+
+        var base64 = Convert.ToBase64String(bytes);
+
+        await JS.InvokeVoidAsync(
+            "downloadFile",
+            $"espacios_{DateTime.Now:yyyyMMdd}.xlsx",
+            base64
+        );
+    }
+
+}
+

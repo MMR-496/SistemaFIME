@@ -1,0 +1,62 @@
+﻿@page "/users"
+@using SistemaFIMETaller.Models
+@using SistemaFIMETaller.Services.CookieAccessToken
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@inject UserClientService UserClientService
+@inject NavigationManager nav
+
+<PageTitle>Usuarios</PageTitle>
+<h3>Usuarios</h3>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Número de Cuenta</th>
+            <th>Correo</th>
+            <th>Rol</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var usuario in usuarios)
+        {
+            <tr>
+                <td>@usuario.UsuarioId</td>
+                <td>@usuario.NombreUsuario</td>
+                <td>@usuario.NumeroCuenta</td>
+                <td>@usuario.CorreoInsti</td>
+                <td>@usuario.Rol</td>
+                <td>
+                    <button class="btn btn-outline-secondary me-1" @onclick="@(() => nav.NavigateTo($"/users/editar/{usuario.UsuarioId}"))">Editar</button>
+                    <button class="btn btn-outline-danger" @onclick="@(() => Eliminar(usuario.UsuarioId))">Eliminar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Usuario> usuarios = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            usuarios = await UserClientService.ObtenerTodos();
+            StateHasChanged();
+        }
+    }
+
+    private async Task Eliminar(int id)
+    {
+        var result = await UserClientService.Eliminar(id);
+        if (result)
+        {
+            usuarios = await UserClientService.ObtenerTodos();
+            StateHasChanged();
+        }
+    }
+}

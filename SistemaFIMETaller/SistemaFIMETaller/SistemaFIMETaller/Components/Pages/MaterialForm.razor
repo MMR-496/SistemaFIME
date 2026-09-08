@@ -1,0 +1,123 @@
+﻿@page "/materiales/nuevo"
+@page "/materiales/editar/{Id:int}"
+@attribute [Authorize(Roles="Admin, Avanzado")]
+@rendermode InteractiveServer
+@inject NavigationManager _navigationManager
+@inject IMaterialService _materialService
+
+<PageTitle>Materiales</PageTitle>
+<h3>@_titulo Material</h3>
+
+<EditForm Model="_material" FormName="frmMaterial" OnValidSubmit="Guardar">
+    <DataAnnotationsValidator />
+
+    
+    <div class="mb-3 row">
+        <label for="txtNumero" class="col-sm-2 col-form-label">Número</label>
+        <div class="col-sm-10">
+            <InputText id="txtNumero" class="form-control" @bind-Value="_material.Numero" />
+            <ValidationMessage For="@(() => _material.Numero)" />
+        </div>
+    </div>
+
+    
+    <div class="mb-3 row">
+        <label for="txtNombre" class="col-sm-2 col-form-label">Nombre</label>
+        <div class="col-sm-10">
+            <InputText id="txtNombre" class="form-control" @bind-Value="_material.Nombre" />
+            <ValidationMessage For="@(() => _material.Nombre)" />
+        </div>
+    </div>
+
+    
+    <div class="mb-3 row">
+        <label for="txtMarca" class="col-sm-2 col-form-label">Marca</label>
+        <div class="col-sm-10">
+            <InputText id="txtMarca" class="form-control" @bind-Value="_material.Marca" />
+        </div>
+    </div>
+
+    
+    <div class="mb-3 row">
+        <label for="txtModelo" class="col-sm-2 col-form-label">Modelo</label>
+        <div class="col-sm-10">
+            <InputText id="txtModelo" class="form-control" @bind-Value="_material.Modelo" />
+        </div>
+    </div>
+
+    
+    <div class="mb-3 row">
+        <label for="txtSerie" class="col-sm-2 col-form-label">Serie</label>
+        <div class="col-sm-10">
+            <InputText id="txtSerie" class="form-control" @bind-Value="_material.Serie" />
+        </div>
+    </div>
+
+    
+    <div class="mb-3 row">
+        <label for="txtUbicacion" class="col-sm-2 col-form-label">Ubicación</label>
+        <div class="col-sm-10">
+            <InputText id="txtUbicacion" class="form-control" @bind-Value="_material.Ubicacion" />
+            <ValidationMessage For="@(() => _material.Ubicacion)" />
+        </div>
+    </div>
+
+    
+    <div class="mb-3 row">
+        <label for="txtCustodio" class="col-sm-2 col-form-label">Custodio</label>
+        <div class="col-sm-10">
+            <InputText id="txtCustodio" class="form-control" @bind-Value="_material.Custodio" />
+            <ValidationMessage For="@(() => _material.Custodio)" />
+        </div>
+    </div>
+
+    
+    <div class="mb-3 row">
+        <label for="txtObservaciones" class="col-sm-2 col-form-label">Observaciones</label>
+        <div class="col-sm-10">
+            <InputText id="txtObservaciones" class="form-control" @bind-Value="_material.Observaciones" />
+        </div>
+    </div>
+
+    
+    <div class="row">
+        <div class="col-sm-10 offset-sm-2">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <button type="button" class="btn btn-danger" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Material _material = new();
+    private string _titulo = "Nuevo ";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id > 0)
+        {
+            var materialExistente = await _materialService.ObtenerPorId(Id);
+            if (materialExistente != null)
+            {
+                _material = materialExistente;
+                _titulo = "Editar ";
+            }
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (Id > 0)
+            await _materialService.Actualizar(_material);
+        else
+            await _materialService.Agregar(_material);
+
+        Cancelar();
+    }
+
+    private void Cancelar()
+    {
+        _navigationManager.NavigateTo("/materiales");
+    }
+}

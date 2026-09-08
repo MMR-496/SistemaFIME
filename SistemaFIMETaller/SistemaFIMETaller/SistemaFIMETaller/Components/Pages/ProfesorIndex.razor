@@ -1,0 +1,139 @@
+﻿@page "/profesores"
+@using SistemaFIMETaller.Services.EspaciosServices
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject NavigationManager _navigator
+@inject IProfesorService _profesorService
+@inject ExcelService ExcelService
+@inject IJSRuntime JS
+
+<h3>Profesores</h3>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Buscar por nombre, apellido o número de cuenta"
+                   @bind="_filtroBusqueda" @bind:event="oninput" />
+            <button class="btn btn-outline-secondary" type="button" @onclick="AplicarFiltro">
+                <i class="bi bi-search"></i> Buscar
+            </button>
+            
+            <AuthorizeView Roles="Admin">
+            <button class="btn btn-success ms-2" @onclick="ExportarExcel">
+                Exportar Excel
+            </button>
+            </AuthorizeView>
+        </div>
+    </div>
+    <div class="col-md-6 text-end">
+        <a class="btn btn-primary" href="profesores/nuevo">Agregar profesor</a>
+    </div>
+</div>
+
+@if (_profesores == null)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Cargando...</span>
+    </div>
+}
+else if (_profesoresFiltrados.Count == 0)
+{
+    <div class="alert alert-warning">
+        @if (string.IsNullOrEmpty(_filtroBusqueda))
+        {
+            <span>No hay profesores registrados</span>
+        }
+        else
+        {
+            <span>No se encontraron profesores con ese criterio</span>
+        }
+    </div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Número de cuenta</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var a in _profesoresFiltrados)
+            {
+                <tr>
+                    <td>@a.NombreProfesor</td>
+                    <td>@a.ApellidoProfesor</td>
+                    <td>@a.NumeroCuentaProfesor</td>
+                    
+                    <AuthorizeView Roles="Admin, Avanzado">
+                    <td>
+                        <button class="btn btn-outline-secondary me-1" @onclick="@(() => Modificar(a.ProfesorId))">Editar</button>
+                        <button class="btn btn-outline-danger" @onclick="@(() => EliminarAsync(a))">Eliminar</button>
+                    </td>
+                    </AuthorizeView>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Profesor>? _profesores;
+    private List<Profesor> _profesoresFiltrados = new();
+    private string _filtroBusqueda = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _profesores = await _profesorService.ObtenerTodos();
+        _profesoresFiltrados = _profesores.ToList();
+    }
+
+    private void AplicarFiltro()
+    {
+        if (string.IsNullOrWhiteSpace(_filtroBusqueda))
+        {
+            _profesoresFiltrados = _profesores!.ToList();
+            return;
+        }
+
+        var t = _filtroBusqueda.ToLower().Trim();
+
+        _profesoresFiltrados = _profesores!
+            .Where(p =>
+                p.NombreProfesor.ToLower().Contains(t) ||
+                p.ApellidoProfesor.ToLower().Contains(t) ||
+                p.NumeroCuentaProfesor.ToLower().Contains(t) 
+            )
+            .ToList();
+    }
+
+    private async Task EliminarAsync(Profesor profesor)
+    {
+        await _profesorService.Eliminar(profesor.ProfesorId);
+        _profesores!.Remove(profesor);
+        AplicarFiltro();
+        StateHasChanged();
+    }
+
+    private void Modificar(int id)
+    {
+        _navigator.NavigateTo($"/profesores/editar/{id}");
+    }
+
+    private async Task ExportarExcel()
+    {
+        var bytes = ExcelService.GenerarExcelProfesores(_profesoresFiltrados);
+
+        var base64 = Convert.ToBase64String(bytes);
+
+        await JS.InvokeVoidAsync(
+            "downloadFile",
+            $"profesores_{DateTime.Now:yyyyMMdd}.xlsx",
+            base64
+        );
+    }
+
+}

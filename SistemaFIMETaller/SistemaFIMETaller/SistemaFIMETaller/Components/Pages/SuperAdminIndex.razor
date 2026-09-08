@@ -1,0 +1,78 @@
+﻿@page "/administrador"
+@rendermode InteractiveServer
+@inject NavigationManager nav
+@attribute [Authorize(Roles = "Admin")]
+@* @inject ExcelService ExcelService
+@inject IJSRuntime JS *@
+
+<h1 class="mb-4">Panel de Control</h1>
+<style>
+    .cards-container {
+        display: flex;
+        flex-direction: row;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+</style>
+
+    <div class="cards-container">
+        <div>
+            <MudCard Outlined="true" Class="pa-4" Style="max-width: 500px;">
+                <MudCardContent>
+                    <MudStack Direction="Row" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Primary" Style="font-size: 5rem" />
+                        <MudText Typo="Typo.h6">
+                            Registro de usuarios
+                        </MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Class="mt-2">
+                        Crea nuevas cuentas y asígnales un rol dentro del sistema.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions Class="mt-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" @onclick="Registrar">
+                        Agregar usuario
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </div>
+        <div>
+            <MudCard Outlined="true" Class="pa-4" Style="max-width: 500px;">
+                <MudCardContent>
+                    <MudStack Direction="Row" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Contacts" Color="Color.Primary" Style="font-size: 5rem" />
+                        <MudText Typo="Typo.h6">
+                            Gestión de usuarios
+                        </MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Class="mt-2">
+                        Consultar, modificar o eliminar usuarios del sistema.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions Class="mt-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" @onclick="Gestionar">
+                        Gestionar
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </div>
+    </div>
+
+
+@code{
+
+    private void Registrar()
+    {
+        nav.NavigateTo("/register", forceLoad: true);
+        
+    }
+ 
+    private void Gestionar()
+    {
+        nav.NavigateTo("/users", forceLoad: true);
+
+    }
+
+
+
+}
+

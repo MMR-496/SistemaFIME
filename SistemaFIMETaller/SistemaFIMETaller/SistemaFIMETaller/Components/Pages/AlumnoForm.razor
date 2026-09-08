@@ -1,0 +1,87 @@
+﻿@page "/alumnos/nuevo"
+@attribute [Authorize]
+@page "/alumnos/editar/{Id:int}"
+@rendermode InteractiveServer
+@inject NavigationManager _navigationManager
+@inject IAlumnoService _alumnoService
+
+<PageTitle>Alumnos</PageTitle>
+<h3>@_titulo Alumno</h3>
+
+<EditForm Model="_alumno" OnValidSubmit="Guardar">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Nombre</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="_alumno.Nombre" />
+            <ValidationMessage For="@(() => _alumno.Nombre)" />
+        </div>
+    </div>
+
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Apellido</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="_alumno.Apellido" />
+            <ValidationMessage For="@(() => _alumno.Apellido)" />
+        </div>
+    </div>
+
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Matrícula</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="_alumno.NumeroCuenta" />
+            <ValidationMessage For="@(() => _alumno.NumeroCuenta)" />
+        </div>
+    </div>
+
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Grupo</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="_alumno.Grupo" />
+            <ValidationMessage For="@(() => _alumno.Grupo)" />
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-sm-10 offset-sm-2">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <button type="button" class="btn btn-danger" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Alumno _alumno = new();
+    private string _titulo = "Nuevo ";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id > 0)
+        {
+            var existente = await _alumnoService.ObtenerPorId(Id);
+            if (existente != null)
+            {
+                _alumno = existente;
+                _titulo = "Editar ";
+            }
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (Id > 0)
+            await _alumnoService.Actualizar(_alumno);
+        else
+            await _alumnoService.Agregar(_alumno);
+
+        Cancelar();
+    }
+
+    private void Cancelar()
+    {
+        _navigationManager.NavigateTo("/alumnos");
+    }
+}

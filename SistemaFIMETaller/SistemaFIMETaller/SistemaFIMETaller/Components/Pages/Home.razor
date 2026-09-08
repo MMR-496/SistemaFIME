@@ -1,0 +1,88 @@
+﻿@page "/"
+@using SistemaFIMETaller.Security
+@using System.Security.Claims
+@using Microsoft.IdentityModel.JsonWebTokens
+@using SistemaFIMETaller.Services.CookieAccessToken
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject JWTAuthenticationStateProvider AuthStateProvider
+@inject AccessTokenService AccessTokenService
+@inject AuthService AuthService
+@inject ResourceService ResourceService
+
+<PageTitle>Home</PageTitle>
+<style>
+    table {
+        width: 100%;
+        max-width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+    }
+
+    td {
+        padding: 8px;
+        border: 1px solid #ddd;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+</style>
+
+
+    <h1>Bienvenido, @NombreUsuario</h1>
+<button class="btn btn-primary" @onclick="Logout">Cerrar Sesión</button>
+
+
+@code {
+    public string NumeroCuenta { get; set; }
+    public string Rol { get; set; }
+    public string Token { get; set; }
+    public string NombreUsuario { get; set; }
+
+    public DateTime TokenExpired { get; set; }
+    public DateTime currentTime { get; set; }
+    public bool IsVerified { get; set; }
+
+    private Timer timer; //debugging
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitialValues();
+        timer = new Timer(UpdateClock, null, 0, 1000); //debugging
+    }
+
+    private async Task InitialValues()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = state.User;
+        if (user.Identity.IsAuthenticated)
+        {
+            Token = await AccessTokenService.GetToken();
+            NumeroCuenta = user.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Name)?.Value;
+            Rol = user.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value;
+            NombreUsuario = user.Claims.FirstOrDefault(x => x.Type == "NombreUsuario")?.Value;
+            var expires = user.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Exp)?.Value;
+            if (long.TryParse(expires, out var exp))
+            {
+                TokenExpired = DateTimeOffset.FromUnixTimeSeconds(exp).LocalDateTime;
+            }
+        }
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.Logout();
+    }
+
+    private async Task VerifyGetRequest()
+    {
+        IsVerified = await ResourceService.Verify();
+
+    }
+
+    private void UpdateClock(object state) //debugging
+    {
+        currentTime = DateTime.Now;
+        InvokeAsync(StateHasChanged);
+
+    }
+}

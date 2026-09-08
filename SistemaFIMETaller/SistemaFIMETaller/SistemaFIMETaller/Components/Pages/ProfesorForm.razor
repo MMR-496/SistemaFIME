@@ -1,0 +1,81 @@
+﻿@page "/profesores/nuevo"
+@page "/profesores/editar/{Id:int}"
+@attribute [Authorize]
+@using SistemaFIMETaller.Services.EspaciosServices
+@rendermode InteractiveServer
+@inject NavigationManager _navigationManager
+@inject IProfesorService _profesorService
+
+<PageTitle>Profesores</PageTitle>
+<h3>@_titulo Profesor</h3>
+
+<EditForm Model="_profesor" OnValidSubmit="Guardar">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Nombre</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="_profesor.NombreProfesor" />
+            <ValidationMessage For="@(() => _profesor.NombreProfesor)" />
+        </div>
+    </div>
+
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Apellido</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="_profesor.ApellidoProfesor" />
+            <ValidationMessage For="@(() => _profesor.ApellidoProfesor)" />
+        </div>
+    </div>
+
+    <div class="mb-3 row">
+        <label class="col-sm-2 col-form-label">Número de cuenta</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="_profesor.NumeroCuentaProfesor" />
+            <ValidationMessage For="@(() => _profesor.NumeroCuentaProfesor)" />
+        </div>
+    </div>
+
+
+    <div class="row">
+        <div class="col-sm-10 offset-sm-2">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <button type="button" class="btn btn-danger" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Profesor _profesor = new();
+    private string _titulo = "Nuevo ";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id > 0)
+        {
+            var existente = await _profesorService.ObtenerPorId(Id);
+            if (existente != null)
+            {
+                _profesor = existente;
+                _titulo = "Editar ";
+            }
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (Id > 0)
+            await _profesorService.Actualizar(_profesor);
+        else
+            await _profesorService.Agregar(_profesor);
+
+        Cancelar();
+    }
+
+    private void Cancelar()
+    {
+        _navigationManager.NavigateTo("/profesores");
+    }
+}

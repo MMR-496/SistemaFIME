@@ -1,0 +1,90 @@
+﻿@page "/espacios/nuevo"
+@page "/espacios/editar/{Id:int}"
+@attribute [Authorize(Roles = "Admin")]
+@using SistemaFIMETaller.Services.EspaciosServices
+@rendermode InteractiveServer
+@inject NavigationManager _navigationManager
+@inject IEspacioService _espacioService
+
+<PageTitle>Espacios</PageTitle>
+<h3>@_titulo Espacio</h3>
+
+<EditForm Model="_espacio" FormName="frmEspacios" OnValidSubmit="Guardar">
+    <DataAnnotationsValidator />
+
+
+    <div class="mb-3 row">
+        <label for="txtNombreEspacio" class="col-sm-2 col-form-label">Nombre Espacio</label>
+        <div class="col-sm-10">
+            <InputText id="txtNombreEspacio" class="form-control" @bind-Value="_espacio.NombreEspacio" />
+            <ValidationMessage For="@(() => _espacio.NombreEspacio)" />
+        </div>
+    </div>
+
+
+    <div class="mb-3 row">
+        <label for="txtUbicacion" class="col-sm-2 col-form-label">Ubicación</label>
+        <div class="col-sm-10">
+            <InputText id="txtUbicacion" class="form-control" @bind-Value="_espacio.Ubicacion" />
+            <ValidationMessage For="@(() => _espacio.Ubicacion)" />
+        </div>
+    </div>
+
+
+    <div class="mb-3 row">
+        <label for="txtResponsable" class="col-sm-2 col-form-label">Responsable</label>
+        <div class="col-sm-10">
+            <InputText id="txtResponsable" class="form-control" @bind-Value="_espacio.Responsable" />
+        </div>
+    </div>
+
+
+    <div class="mb-3 row">
+        <label for="txtObservaciones" class="col-sm-2 col-form-label">Observaciones</label>
+        <div class="col-sm-10">
+            <InputText id="txtObservaciones" class="form-control" @bind-Value="_espacio.Observaciones" />
+        </div>
+    </div>
+
+
+    <div class="row">
+        <div class="col-sm-10 offset-sm-2">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <button type="button" class="btn btn-danger" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Espacio _espacio= new();
+    private string _titulo = "Nuevo ";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id > 0)
+        {
+            var espacioExistente = await _espacioService.ObtenerPorId(Id);
+            if (espacioExistente != null)
+            {
+                _espacio = espacioExistente;
+                _titulo = "Editar ";
+            }
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (Id > 0)
+            await _espacioService.Actualizar(_espacio);
+        else
+            await _espacioService.Agregar(_espacio);
+
+        Cancelar();
+    }
+
+    private void Cancelar()
+    {
+        _navigationManager.NavigateTo("/espacios");
+    }
+}

@@ -1,0 +1,193 @@
+﻿@page "/accesos"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+
+@inject IJSRuntime JS
+@inject IAlumnoService AlumnoService
+@inject IRegistroAccesoService AccesoService
+@inject ExcelService ExcelService
+
+<h3>Registro de Ingresos y Egresos</h3>
+
+
+<video id="qrVideo" width="320" class="border"></video>
+<br />
+<button class="btn btn-primary my-2" @onclick="IniciarEscaneo">
+    📷 Escanear QR
+</button>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @tipoMensaje mt-3">
+        @mensaje
+    </div>
+}
+
+@if (alumnoEncontrado != null)
+{
+    <div class="card p-3 mt-3">
+        <p><strong>Nombre:</strong> @alumnoEncontrado.Nombre @alumnoEncontrado.Apellido</p>
+        <p><strong>Número de cuenta:</strong> @alumnoEncontrado.NumeroCuenta</p>
+        <p><strong>Fecha:</strong> @DateTime.Today.ToString("dd/MM/yyyy")</p>
+        <p><strong>Hora:</strong> @DateTime.Now.ToString("HH:mm:ss")</p>
+    </div>
+}
+
+<hr />
+<AuthorizeView Roles="Admin">
+<h4>Historial de accesos</h4>
+
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="input-group">
+            <input type="text"
+                   class="form-control"
+                   placeholder="Buscar por nombre, cuenta o fecha (dd/MM/yyyy)"
+                   @bind="filtroBusqueda"
+                   @bind:event="oninput" />
+            <button class="btn btn-outline-secondary" type="button" @onclick="AplicarFiltro">
+                Buscar
+            </button>
+            <button class="btn btn-success ms-2" @onclick="ExportarExcel">
+                Exportar Excel
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (registrosFiltrados.Count == 0)
+{
+    <div class="alert alert-warning">
+        No se encontraron registros
+    </div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Nombre</th>
+                <th>Cuenta</th>
+                <th>Ingreso</th>
+                <th>Salida</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in registrosFiltrados)
+            {
+                <tr class="@GetClaseEstado(r)">
+                    <td>@r.Fecha.ToString("dd/MM/yyyy")</td>
+                    <td>@r.NombreCompleto</td>
+                    <td>@r.NumeroCuenta</td>
+                    <td>@(r.HoraIngreso?.ToString(@"hh\:mm\:ss"))</td>
+                    <td>@(r.HoraSalida?.ToString(@"hh\:mm\:ss"))</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+</AuthorizeView>
+@code {
+    private Alumno? alumnoEncontrado;
+    private string mensaje;
+    private string tipoMensaje = "alert-info";
+
+    private List<RegistroAcceso> registros = new();
+    private List<RegistroAcceso> registrosFiltrados = new();
+
+    private string filtroBusqueda = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        registros = await AccesoService.ObtenerTodos();
+        registrosFiltrados = registros.ToList();
+    }
+
+    private async Task IniciarEscaneo()
+    {
+        mensaje = "";
+        alumnoEncontrado = null;
+
+        await JS.InvokeVoidAsync(
+            "startQrCameraScan",
+            "qrVideo",
+            DotNetObjectReference.Create(this)
+        );
+    }
+
+    [JSInvokable]
+    public async Task OnQrScanned(string cuenta)
+    {
+        alumnoEncontrado = await AlumnoService.ObtenerPorCuenta(cuenta);
+
+        if (alumnoEncontrado == null)
+        {
+            mensaje = "No existe un alumno con ese número de cuenta";
+            tipoMensaje = "alert-danger";
+            StateHasChanged();
+            return;
+        }
+
+        var nombreCompleto = $"{alumnoEncontrado.Nombre} {alumnoEncontrado.Apellido}";
+        var activo = await AccesoService.ObtenerActivoPorCuenta(cuenta);
+
+        if (activo == null)
+        {
+            await AccesoService.RegistrarIngreso(cuenta, nombreCompleto);
+            mensaje = " Ingreso registrado correctamente";
+            tipoMensaje = "alert-success";
+        }
+        else
+        {
+            await AccesoService.RegistrarSalida(cuenta);
+            mensaje = "🚪 Salida registrada correctamente";
+            tipoMensaje = "alert-warning";
+        }
+
+        registros = await AccesoService.ObtenerTodos();
+        AplicarFiltro();
+        StateHasChanged();
+    }
+
+    private void AplicarFiltro()
+    {
+        if (string.IsNullOrWhiteSpace(filtroBusqueda))
+        {
+            registrosFiltrados = registros.ToList();
+            return;
+        }
+
+        var t = filtroBusqueda.Trim().ToLower();
+
+        registrosFiltrados = registros
+            .Where(r =>
+                r.NombreCompleto.ToLower().Contains(t) ||
+                r.NumeroCuenta.ToLower().Contains(t) ||
+                r.Fecha.ToString("dd/MM/yyyy").Contains(t)
+            )
+            .ToList();
+    }
+
+    private string GetClaseEstado(RegistroAcceso r)
+    {
+        return r.HoraSalida == null
+            ? "table-success"  
+            : "table-danger";   
+    }
+    private async Task ExportarExcel()
+    {
+        var bytes = ExcelService.GenerarExcelAccesos(registrosFiltrados);
+
+        var base64 = Convert.ToBase64String(bytes);
+
+        await JS.InvokeVoidAsync(
+            "downloadFile",
+            $"accesos_{DateTime.Now:yyyyMMdd}.xlsx",
+            base64
+        );
+    }
+
+}

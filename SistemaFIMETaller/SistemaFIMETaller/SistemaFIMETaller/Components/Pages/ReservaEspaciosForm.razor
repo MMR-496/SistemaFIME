@@ -1,0 +1,264 @@
+﻿@rendermode InteractiveServer
+@attribute [Authorize]
+@page "/reserva/nuevo"
+@page "/reserva/editar/{Id:int}"
+
+@using SistemaFIMETaller.Services.EspaciosServices
+@using MudBlazor
+@using System.Threading
+
+@inject NavigationManager _navigator
+@inject IReservaEspacioService _reservaService
+@inject IAlumnoService _alumnoService
+@inject IProfesorService _profesorService
+
+
+<h3>Reserva de Espacios</h3>
+
+<EditForm Model="_reservaEspacio" OnSubmit="Guardar">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    @if (_mostrarMensaje)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+            @_mensajeError
+            <MudButton OnClick="CerrarMensaje" Variant="Variant.Text">Cerrar</MudButton>
+        </MudAlert>
+    }
+
+    <!-- ESPACIO -->
+    <label>Selecciona el espacio:</label>
+    <InputSelect @bind-Value="_espacioSeleccionado">
+        <option value="">-- Selecciona --</option>
+        @foreach (var espacio in _espacios)
+        {
+            <option value="@espacio.EspacioId">@espacio.NombreEspacio</option>
+        }
+    </InputSelect>
+
+    <br /><br />
+
+    <!-- ALUMNO -->
+    <MudAutocomplete T="Alumno"
+                     Value="_alumnoSeleccionado"
+                     ValueChanged="SelectAlumn"
+                     SearchFunc="SearchAlumno"
+                     ToStringFunc="a => a == null ? string.Empty : a.Nombre"
+                     Placeholder="Seleccionar alumno"
+                     Clearable="true" />
+
+    <br /><br />
+
+    <!-- PROFESOR -->
+    <MudAutocomplete T="Profesor"
+                     Value="_profesorSeleccionado"
+                     ValueChanged="SelectProfesor"
+                     SearchFunc="SearchProfesor"
+                     ToStringFunc="p => p == null ? string.Empty : p.NombreProfesor"
+                     Placeholder="Seleccionar profesor"
+                     Clearable="true" />
+
+    <br /><br />
+
+    <!-- FECHA -->
+    <MudDatePicker Label="Selecciona el día"
+                   @bind-Date="_date"
+                   IsDateDisabledFunc="@( (DateTime date) => date < _currentDay || date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)" />
+
+    <br /><br />
+
+    <!-- HORA -->
+    <label>Hora de inicio:</label>
+    <InputSelect @bind-Value="_time">
+        <option value="">-- Selecciona --</option>
+        @foreach (var horario in _horariosPosibles)
+        {
+            <option value="@horario">@horario</option>
+        }
+    </InputSelect>
+
+    <br /><br />
+
+    <!-- DURACIÓN -->
+    <label>Duración (horas):</label>
+    <InputNumber @bind-Value="_duracion" Min="1" Max="4" />
+
+    <br /><br />
+
+    <!-- BOTÓN (CAMBIO IMPORTANTE) -->
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled">
+        Guardar
+    </MudButton>
+
+</EditForm>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    public ReservaEspacio _reservaEspacio = new();
+
+    private List<Espacio> _espacios = new();
+    private List<Alumno> _alumnos = new();
+    private List<Profesor> _profesores = new();
+    private List<TimeSpan> _horariosPosibles = new();
+
+    private DateTime? _date;
+    private DateTime _currentDay = DateTime.Today;
+    private TimeSpan? _time;
+    private int _duracion = 1;
+
+    private Alumno? _alumnoSeleccionado;
+    private Profesor? _profesorSeleccionado;
+    private int? _espacioSeleccionado;
+
+    private bool _mostrarMensaje = false;
+    private string _mensajeError = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _espacios = await _reservaService.GetEspacios();
+        _alumnos = await _alumnoService.ObtenerTodos();
+        _profesores = await _profesorService.ObtenerTodos();
+
+        for (int i = 7; i <= 21; i++)
+        {
+            _horariosPosibles.Add(new TimeSpan(i, 0, 0));
+        }
+
+        if (Id > 0)
+        {
+            var reservaExistente = await _reservaService.ObtenerPorId(Id);
+            if (reservaExistente != null)
+            {
+                _reservaEspacio = reservaExistente;
+
+                _date = reservaExistente.Fecha;
+                _time = reservaExistente.HoraInicio;
+                _espacioSeleccionado = reservaExistente.EspacioId;
+
+                _duracion = (int)(reservaExistente.HoraFin - reservaExistente.HoraInicio).TotalHours;
+                
+                _alumnoSeleccionado = _alumnos.FirstOrDefault(a => a.AlumnoId == reservaExistente.AlumnoId); //pone el primero que encuentra o default (nullww)
+                _profesorSeleccionado = _profesores.FirstOrDefault(p => p.ProfesorId == reservaExistente.ProfesorId);
+            }
+        }
+    }
+
+    private async Task<IEnumerable<Alumno>> SearchAlumno(string alumno, CancellationToken token)
+    {
+        await Task.Delay(5, token);
+
+        if (string.IsNullOrEmpty(alumno))
+            return _alumnos;
+
+        return _alumnos.Where(a => a.Nombre.Contains(alumno, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private async Task<IEnumerable<Profesor>> SearchProfesor(string profesor, CancellationToken token)
+    {
+        await Task.Delay(5, token);
+
+        if (string.IsNullOrEmpty(profesor))
+            return _profesores;
+
+        return _profesores.Where(p => p.NombreProfesor.Contains(profesor, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private void SelectAlumn(Alumno a)
+    {
+        _alumnoSeleccionado = a;
+        if (a != null)
+        {
+            _reservaEspacio.AlumnoId = a.AlumnoId;
+        }
+    }
+
+    private void SelectProfesor(Profesor p)
+    {
+        _profesorSeleccionado = p;
+        if (p != null)
+        {
+            _reservaEspacio.ProfesorId = p.ProfesorId;
+        }
+    }
+
+    private async Task Guardar()
+    {
+
+        if (_time == null || _espacioSeleccionado == null || _date == null || (_alumnoSeleccionado == null && _profesorSeleccionado == null))
+        {
+            _mensajeError = "Faltan datos";
+            _mostrarMensaje = true;
+            return;
+        }
+
+        if (Id > 0)
+        {
+            var reservaBD = await _reservaService.ObtenerPorId(Id);
+            if (reservaBD == null) return;
+
+            TimeSpan fin = _time.Value.Add(TimeSpan.FromHours(_duracion));
+
+            bool disponible = await _reservaService.HorarioDisponible(
+                _espacioSeleccionado.Value,
+                _date.Value,
+                _time.Value,
+                fin,
+                Id
+            );
+
+            if (!disponible)
+            {
+                _mensajeError = "Horario ocupado";
+                _mostrarMensaje = true;
+                return;
+            }
+
+            reservaBD.Fecha = _date.Value;
+            reservaBD.HoraInicio = _time.Value;
+            reservaBD.HoraFin = fin;
+            reservaBD.EspacioId = _espacioSeleccionado.Value;
+
+            reservaBD.AlumnoId = _reservaEspacio.AlumnoId;
+            reservaBD.ProfesorId = _reservaEspacio.ProfesorId;
+
+            await _reservaService.Actualizar(reservaBD);
+
+            _navigator.NavigateTo("/reserva");
+        }
+        else
+        {
+            TimeSpan fin = _time.Value.Add(TimeSpan.FromHours(_duracion));
+
+            bool disponible = await _reservaService.HorarioDisponible(
+                _espacioSeleccionado.Value,
+                _date.Value,
+                _time.Value,
+                fin
+            );
+
+            if (!disponible)
+            {
+                _mensajeError = "Horario ocupado";
+                _mostrarMensaje = true;
+                return;
+            }
+
+            _reservaEspacio.Fecha = _date.Value;
+            _reservaEspacio.HoraInicio = _time.Value;
+            _reservaEspacio.HoraFin = fin;
+            _reservaEspacio.EspacioId = _espacioSeleccionado.Value;
+
+            await _reservaService.Agregar(_reservaEspacio);
+
+            _navigator.NavigateTo("/reserva");
+        }
+
+    }
+
+    private void CerrarMensaje()
+    {
+        _mostrarMensaje = false;
+    }
+}

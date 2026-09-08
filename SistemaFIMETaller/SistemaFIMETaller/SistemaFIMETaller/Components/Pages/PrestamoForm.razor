@@ -1,0 +1,335 @@
+﻿@page "/prestamos/nuevo"
+@page "/prestamos/editar/{Id:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+@inject IPrestamoService _prestamoService
+@inject IAlumnoService _alumnoService
+@inject IMaterialService _materialService
+
+<h3>@_titulo Préstamo</h3>
+
+@if (_prestamo == null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <EditForm Model="_prestamo" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <fieldset disabled="@_bloqueado">
+
+            <div class="mb-3 row">
+                <label class="col-sm-2 col-form-label">Alumno</label>
+                <div class="col-sm-10">
+
+                    <input class="form-control"
+                           placeholder="Buscar alumno por nombre o matrícula..."
+                           @bind="TextoBusquedaAlumno"
+                           @bind:event="oninput" />
+
+                    @if (textoBusquedaAlumno.Length >= 1 && alumnosFiltrados.Count > 0)
+                    {
+                        <ul class="list-group mt-2" style="max-height: 200px; overflow-y: auto;">
+                            @foreach (var a in alumnosFiltrados)
+                            {
+                                <li class="list-group-item list-group-item-action"
+                                    style="cursor:pointer"
+                                    @onclick="@(() => SeleccionarAlumno(a))">
+                                    @a.Nombre @a.Apellido (@a.NumeroCuenta)
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    @if (_alumnoSeleccionado != null)
+                    {
+                        <div class="alert alert-info mt-2 p-2">
+                            Seleccionado: <b>@_alumnoSeleccionado.Nombre @_alumnoSeleccionado.Apellido</b>
+                            <br />
+                            Matrícula: <b>@_alumnoSeleccionado.NumeroCuenta</b>
+                        </div>
+                    }
+
+                </div>
+            </div>
+
+            
+            <div class="mb-3 row">
+                <label class="col-sm-2 col-form-label">Fecha</label>
+                <div class="col-sm-10">
+                    <InputDate class="form-control" @bind-Value="_prestamo.Fecha" />
+                </div>
+            </div>
+
+            
+            <div class="mb-3 row">
+                <label class="col-sm-2 col-form-label">Materiales</label>
+                <div class="col-sm-10">
+
+                    <input class="form-control"
+                           placeholder="Buscar material..."
+                           @bind="TextoBusquedaMaterial"
+                           @bind:event="oninput" />
+
+                    @if (textoBusquedaMaterial.Length >= 1 && materialesFiltrados.Count > 0)
+                    {
+                        <ul class="list-group mt-2" style="max-height: 200px; overflow-y: auto;">
+                            @foreach (var m in materialesFiltrados)
+                            {
+                                <li class="list-group-item list-group-item-action"
+                                    style="cursor: pointer;"
+                                    @onclick="@(() => SeleccionarMaterial(m))">
+                                    @m.Nombre (@m.Numero)
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    
+                    <div class="mt-3">
+                        <h6>Seleccionados:</h6>
+
+                        @if (_materialesSeleccionadosObj.Count == 0)
+                        {
+                            <p class="text-muted">Ninguno</p>
+                        }
+                        else
+                        {
+                            @foreach (var mat in _materialesSeleccionadosObj)
+                            {
+                                <span class="badge bg-primary me-2">
+                                    @mat.Nombre (@mat.Numero)
+                                    <button type="button"
+                                            class="btn-close btn-close-white ms-1"
+                                            style="float:right; font-size:0.6rem;"
+                                            @onclick="@(() => QuitarMaterial(mat.Id))"></button>
+                                </span>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+           
+            <div class="mb-3 row">
+                <label class="col-sm-2 col-form-label">Observaciones</label>
+                <div class="col-sm-10">
+                    <InputTextArea class="form-control" @bind-Value="_prestamo.Observaciones" />
+                </div>
+            </div>
+
+        </fieldset>
+
+        
+        <div class="mb-3">
+            @if (_prestamo.Estado)
+            {
+                <span class="badge bg-primary">Activo</span>
+            }
+            else
+            {
+                <span class="badge bg-danger">Entregado</span>
+            }
+        </div>
+
+        
+        <div class="mt-3">
+            @if (!_bloqueado)
+            {
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            }
+
+            <button type="button" class="btn btn-secondary ms-2" @onclick="Cancelar">
+                Cancelar
+            </button>
+        </div>
+
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Prestamo _prestamo = new();
+    private string _titulo = "Nuevo";
+    private bool _bloqueado = false;
+
+    private List<Alumno> _alumnosDisponibles = new();
+    private List<Material> _materialesDisponibles = new();
+
+    private Alumno? _alumnoSeleccionado = null;
+
+    private List<int> _materialesSeleccionados = new();
+    private List<Material> _materialesSeleccionadosObj = new();
+
+    
+    private string textoBusquedaAlumno = "";
+    private List<Alumno> alumnosFiltrados = new();
+
+    private string TextoBusquedaAlumno
+    {
+        get => textoBusquedaAlumno;
+        set
+        {
+            textoBusquedaAlumno = value;
+            FiltrarAlumnos();
+        }
+    }
+
+    private void FiltrarAlumnos()
+    {
+        if (string.IsNullOrWhiteSpace(textoBusquedaAlumno))
+        {
+            alumnosFiltrados.Clear();
+            return;
+        }
+
+        alumnosFiltrados = _alumnosDisponibles
+            .Where(a =>
+                (a.Nombre + " " + a.Apellido).Contains(textoBusquedaAlumno, StringComparison.OrdinalIgnoreCase) ||
+                a.NumeroCuenta.Contains(textoBusquedaAlumno, StringComparison.OrdinalIgnoreCase))
+            .Take(20)
+            .ToList();
+    }
+
+    private void SeleccionarAlumno(Alumno a)
+    {
+        _alumnoSeleccionado = a;
+        _prestamo.AlumnoId = a.AlumnoId;
+
+        textoBusquedaAlumno = "";
+        alumnosFiltrados.Clear();
+    }
+
+   
+    private string textoBusquedaMaterial = "";
+    private List<Material> materialesFiltrados = new();
+
+    private string TextoBusquedaMaterial
+    {
+        get => textoBusquedaMaterial;
+        set
+        {
+            textoBusquedaMaterial = value;
+            FiltrarMateriales();
+        }
+    }
+
+    private void FiltrarMateriales()
+    {
+        if (string.IsNullOrWhiteSpace(textoBusquedaMaterial))
+        {
+            materialesFiltrados.Clear();
+            return;
+        }
+
+        materialesFiltrados = _materialesDisponibles
+            .Where(m =>
+                m.Nombre.Contains(textoBusquedaMaterial, StringComparison.OrdinalIgnoreCase) ||
+                m.Numero.Contains(textoBusquedaMaterial, StringComparison.OrdinalIgnoreCase))
+            .Take(20)
+            .ToList();
+    }
+
+    private void SeleccionarMaterial(Material m)
+    {
+        if (!_materialesSeleccionados.Contains(m.Id))
+        {
+            _materialesSeleccionados.Add(m.Id);
+            _materialesSeleccionadosObj.Add(m);
+        }
+
+        textoBusquedaMaterial = "";
+        materialesFiltrados.Clear();
+    }
+
+    private void QuitarMaterial(int id)
+    {
+        _materialesSeleccionados.Remove(id);
+        var obj = _materialesSeleccionadosObj.FirstOrDefault(x => x.Id == id);
+        if (obj != null)
+            _materialesSeleccionadosObj.Remove(obj);
+    }
+
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _alumnosDisponibles = await _alumnoService.ObtenerTodos();
+        _materialesDisponibles = await _materialService.ObtenerTodos();
+
+        if (Id > 0)
+        {
+            var existente = await _prestamoService.ObtenerPorId(Id);
+            if (existente != null)
+            {
+                _prestamo = existente;
+                _titulo = "Editar";
+                _bloqueado = !_prestamo.Estado;
+
+                _alumnoSeleccionado = _alumnosDisponibles
+                    .FirstOrDefault(a => a.AlumnoId == existente.AlumnoId);
+
+                _materialesSeleccionados = existente.PrestamoMateriales
+                    .Select(pm => pm.MaterialId)
+                    .ToList();
+
+                _materialesSeleccionadosObj = _materialesDisponibles
+                    .Where(m => _materialesSeleccionados.Contains(m.Id))
+                    .ToList();
+            }
+        }
+        else
+        {
+            _prestamo.Fecha = DateTime.Now;
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (_alumnoSeleccionado == null)
+            return;
+
+        Prestamo prestamoBD;
+
+        if (Id > 0)
+        {
+            prestamoBD = await _prestamoService.ObtenerPorId(Id);
+            if (prestamoBD == null) return;
+
+            prestamoBD.AlumnoId = _prestamo.AlumnoId;
+            prestamoBD.Fecha = _prestamo.Fecha;
+            prestamoBD.Observaciones = _prestamo.Observaciones;
+
+            var actuales = prestamoBD.PrestamoMateriales.Select(pm => pm.MaterialId).ToList();
+            var nuevos = _materialesSeleccionados.Except(actuales);
+            foreach (var matId in nuevos)
+            {
+                prestamoBD.PrestamoMateriales.Add(new PrestamoMaterial
+                {
+                    MaterialId = matId,
+                    PrestamoId = prestamoBD.Id
+                });
+            }
+
+            var quitar = actuales.Except(_materialesSeleccionados);
+            prestamoBD.PrestamoMateriales.RemoveAll(pm => quitar.Contains(pm.MaterialId));
+
+            await _prestamoService.Actualizar(prestamoBD);
+        }
+        else
+        {
+            _prestamo.PrestamoMateriales = _materialesSeleccionados
+                .Select(id => new PrestamoMaterial { MaterialId = id })
+                .ToList();
+
+            await _prestamoService.Agregar(_prestamo);
+        }
+
+        Nav.NavigateTo("/prestamos");
+    }
+
+    private void Cancelar() => Nav.NavigateTo("/prestamos");
+}
